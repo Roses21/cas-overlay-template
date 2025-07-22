@@ -100,13 +100,6 @@
 - Kiểm tra từ bên ngoài: _http://<IP_public_of_EC2>/cas/_
   - Để check được IP public của EC2, chạy lệnh: ```curl ifconfig.me ```
 - Login bằng user đã khai báo trong _application.yml_
-- Dùng thông tin trên để đăng nhập vào CAS:
-  
-  <img width="1734" height="731" alt="image" src="https://github.com/user-attachments/assets/c60487ba-4c23-4a20-bf2a-f77baccfd093" />
-
-  - Log ghi nhận:
-
-    <img width="1136" height="146" alt="image" src="https://github.com/user-attachments/assets/548fa314-a8b9-4e93-8e5c-c442ac3cd680" />
 
 
   
