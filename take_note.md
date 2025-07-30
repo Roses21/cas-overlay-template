@@ -95,11 +95,77 @@
   # my-demo-cas: Tên Docker image đã build trước.
   ```
 
+  > Lưu ý:
+  > Cách mount thư mục này sẽ không phù hợp để phát triển dự án lâu dài vì: dev khác không có file _./config_ thì container lỗi, khó CI/CD.
+  > Do đó nên đóng gói config files vào image rồi build luôn (thực hiện phía bên dưới).
+  
 ### 🍊 4. Kiểm tra CAS đã hoạt động hay chưa
 - Kiểm tra từ bên trong EC2: ```curl -i http://localhost:8080/cas```
 - Kiểm tra từ bên ngoài: _http://<IP_public_of_EC2>/cas/_
   - Để check được IP public của EC2, chạy lệnh: ```curl ifconfig.me ```
 - Login bằng user đã khai báo trong _application.yml_
 
+## 🌹 Đóng gói cấu hình CAS vào Docker image
+### 🍊 1. Hướng thực hiện
+- Tạo thư mục chứa config CAS gồm file .properties, .json,...
+- Viết Dockerfile để copy config đó vào đúng vị trí trong image.
+- Build image riêng và dùng image này để chạy container.
 
+### 🍊 2. Thực hiện
+- Cây thư mục sẽ như thế này:
+  ```
+  ssl_Docker_cas/
+  ├── Dockerfile
+  └── config/
+      └── application.yml
+  ```
+- Sửa Dockerfile: copy folder cấu hình _config/_ vào image CAS: thêm lệnh ```COPY config /etc/cas/config```
+
+  ```yml
+  #------------ BUILD STAGE ---------------
+  # Image Gradle with JDK 21
+  FROM gradle:8.7-jdk21 AS build
   
+  # Install Git
+  RUN apt-get update && apt-get install -y git
+  
+  WORKDIR /cas-overlay-template
+  RUN git clone https://github.com/apereo/cas-overlay-template.git .
+  
+  RUN ./gradlew clean build -x test
+  
+  #------------ RUNTIME STAGE -------------
+  FROM openjdk:21-jdk-slim AS runtime
+  
+  WORKDIR /cas-overlay-template
+  
+  COPY --from=build /cas-overlay-template/build/libs/cas.war ./cas.war
+  
+  COPY config /etc/cas/config
+  
+  RUN keytool -genkeypair \
+      -alias cas \
+      -keyalg RSA \
+      -keysize 2048 \
+      -storetype PKCS12 \
+      -keystore cas.p12 \
+      -storepass <pass> \
+      -keypass <pass> \
+      -validity 365 \
+      -dname "CN=localhost, OU=Dev, O=MyOrg, L=City, S=State, C=US"
+  
+  EXPOSE 8443
+  
+  ENTRYPOINT ["java", "-jar", "cas.war",\
+    "--server.ssl.key-store=cas.p12",\
+    "--server.ssl.key-store-password=<pass>",\
+    "--server.ssl.key-password=<pass>",\
+    "--server.ssl.key-store-type=PKCS12",\
+    "--server.port=8443"]
+    ```
+- Build image: ```docker build -t cas-application .```
+- Run container từ image vừa build: ```docker run --rm -d -p 8443:8443 --name cas cas-application```
+
+## 🌹 Hướng tiếp theo: Tích hợp CAS với LDAP
+
+Khi người dùng đăng nhập vào CAS → CAS sẽ xác thực thông tin qua LDAP server.
